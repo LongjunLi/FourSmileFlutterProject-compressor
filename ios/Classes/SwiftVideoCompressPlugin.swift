@@ -192,49 +192,56 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
         
         let isIncludeAudio = includeAudio != nil ? includeAudio! : true
         
-        let session = getComposition(isIncludeAudio, timeRange, sourceVideoTrack!)
-        
-        let exporter = AVAssetExportSession(asset: session, presetName: getExportPreset(quality))!
-        
-        exporter.outputURL = compressionUrl
-        exporter.outputFileType = AVFileType.mp4
-        exporter.shouldOptimizeForNetworkUse = true
-        
-        if frameRate != nil {
-            let videoComposition = AVMutableVideoComposition(propertiesOf: sourceVideoAsset)
-            videoComposition.frameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate!))
-            exporter.videoComposition = videoComposition
-        }
-        
-        if !isIncludeAudio {
-            exporter.timeRange = timeRange
-        }
-        
-        Utility.deleteFile(compressionUrl.absoluteString)
-        
-        let timer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(self.updateProgress),
-                                         userInfo: exporter, repeats: true)
-        
-        exporter.exportAsynchronously(completionHandler: {
-            if deleteOrigin {
-                timer.invalidate()
-                let fileManager = FileManager.default
-                do {
-                    if fileManager.fileExists(atPath: path) {
-                        try fileManager.removeItem(atPath: path)
-                    }
-                    self.exporter = nil
-                    self.stopCommand = false
-                }
-                catch let error as NSError {
-                    print(error)
-                }
-            }
-            var json = self.getMediaInfoJson(compressionUrl.absoluteString)
-            json["isCancel"] = false
+        if sourceVideoTrack == nil {
+            var json = self.getMediaInfoJson(sourceVideoUrl.absoluteString)
+            json["isCancel"] = true
             let jsonString = Utility.keyValueToJson(json)
             result(jsonString)
-        })
+        } else {
+            let session = getComposition(isIncludeAudio, timeRange, sourceVideoTrack!)
+            
+            let exporter = AVAssetExportSession(asset: session, presetName: getExportPreset(quality))!
+            
+            exporter.outputURL = compressionUrl
+            exporter.outputFileType = AVFileType.mp4
+            exporter.shouldOptimizeForNetworkUse = true
+            
+            if frameRate != nil {
+                let videoComposition = AVMutableVideoComposition(propertiesOf: sourceVideoAsset)
+                videoComposition.frameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate!))
+                exporter.videoComposition = videoComposition
+            }
+            
+            if !isIncludeAudio {
+                exporter.timeRange = timeRange
+            }
+            
+            Utility.deleteFile(compressionUrl.absoluteString)
+            
+            let timer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(self.updateProgress),
+                                             userInfo: exporter, repeats: true)
+            
+            exporter.exportAsynchronously(completionHandler: {
+                if deleteOrigin {
+                    timer.invalidate()
+                    let fileManager = FileManager.default
+                    do {
+                        if fileManager.fileExists(atPath: path) {
+                            try fileManager.removeItem(atPath: path)
+                        }
+                        self.exporter = nil
+                        self.stopCommand = false
+                    }
+                    catch let error as NSError {
+                        print(error)
+                    }
+                }
+                var json = self.getMediaInfoJson(compressionUrl.absoluteString)
+                json["isCancel"] = false
+                let jsonString = Utility.keyValueToJson(json)
+                result(jsonString)
+            })
+        }
     }
     
     private func cancelCompression(_ result: FlutterResult) {
